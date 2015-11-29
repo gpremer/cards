@@ -11,7 +11,7 @@ object Cards {
 
   /**
     * The Deck trait describes the minimal operations (insert, remove and size check) on a deck. How these are used to
-    * deal and shuffle cards is described in other traits.
+    * deal and shuffle cards is prescribed in other traits.
     * The date structure is purely functional: there is no mutable state. This means that "modifying" operations return
     * a new instance. The implementation is of course expected make sure that those operations avoid making copies of
     * the data as much as possible.
@@ -336,7 +336,7 @@ object Demo extends App {
   }
 
   /**
-    * A recipe for handing out cards for the Belgian game of Wiezen (on extended version of Whist).
+    * A recipe for handing out cards for the Belgian game of Wiezen (an extended version of Whist).
     * We leave the choice of shuffling strategy open.
     */
   trait Wiezen extends PieceWiseDealGame[FrenchCard] with TopDealing[FrenchCard] {
@@ -345,7 +345,7 @@ object Demo extends App {
     val maxShuffles = 40
 
     override def dealAll(deck: Deck[FrenchCard]): AllHands[FrenchCard] =
-      super.dealAll(shuffler.shuffle(deck)) // We now have 12 list of cards: one for every deal group
+      super.dealAll(shuffler.shuffle(deck)) // We now have 12 lists of cards: one for every deal group
         .grouped(4) // combine per deal round: We now have 3 lists that contains lists of cards for all players
         .toList // grouped returns an iterator, but transpose needs a list
         .transpose // we need lists per player not per round. Transpose fixes this
