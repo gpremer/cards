@@ -1,9 +1,11 @@
 package net.premereur.cards.java;
 
-import java.util.Optional;
-
 /**
- * Created by gpremer on 11/28/15.
+ * A typical Java implementation of a Deck of cards. Let's go for a traditional mutable interface. Also, unlike in a
+ * functional version, any out-of-bounds access will trigger a RuntimeException. To keep things efficient, peek and swap
+ * have been added to the interface.
+ *
+ * @param <Card> The type of cards in the deck
  */
 interface Deck<Card> {
 
@@ -17,25 +19,27 @@ interface Deck<Card> {
         return size() != 0;
     }
 
-    RemoveResult<Card, Card> removeNth(int n);
+    Card removeNth(int n);
 
-    default RemoveResult<Card, Card> removeFirst() {
+    default Card removeFirst() {
         return removeNth(0);
     }
 
-    default RemoveResult<Card, Card> removeLast() {
+    default Card removeLast() {
         return removeNth(size() - 1);
     }
 
-    Deck<Card> insertNth(int n, Card card);
+    void insertNth(int n, Card card);
 
-    default Deck<Card> insertFirst(Card card) {
-        return insertNth(0, card);
+    default void insertFirst(Card card) {
+        insertNth(0, card);
     }
 
-    default Deck<Card> insertLast(Card card) {
-        return insertNth(0, card);
+    default void insertLast(Card card) {
+        insertNth(0, card);
     }
 
-    Optional<Card> peek(int n);
+    Card peek(int n);
+
+    void swap(int i, int j);
 }

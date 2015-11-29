@@ -1,8 +1,10 @@
 package net.premereur.cards.java;
 
 /**
- * Created by gpremer on 11/28/15.
+ * A dealing strategy. Modifies the deck in-place.
+ *
+ * @param <Card> The type of cards in the deck
  */
 public interface Dealer<Card> {
-    RemoveResult<Card, Card> deal(Deck<Card> deck);
+    Card deal(Deck<Card> deck);
 }

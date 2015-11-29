@@ -2,28 +2,37 @@ package net.premereur.cards.java;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 
 /**
- * Created by gpremer on 11/28/15.
+ * Some sample applications of the strategies set up previously.
  */
 public class GameDemo {
+    /**
+     * A kind of Game that deals all available cards to a number of players.
+     *
+     * @param <Card> The type of cards to play with
+     */
     interface CompleteDealGame<Card> {
         List<List<Card>> dealAll(Deck<Card> deck);
     }
 
-    enum Suit {
-        Harts, Diamonds, Spades, Clubs
-    }
-
-    enum Value {
-        Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King
-    }
-
+    /**
+     * The classical French cards.
+     */
     static class FrenchCard {
+        @SuppressWarnings("unused")
+        enum Suit {
+            Harts, Diamonds, Spades, Clubs
+        }
+
+        @SuppressWarnings("unused")
+        enum Value {
+            Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King
+        }
+
         private Suit suit;
         private Value value;
 
@@ -32,23 +41,7 @@ public class GameDemo {
             this.value = value;
         }
 
-        @Override
-        public boolean equals(final Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            final FrenchCard that = (FrenchCard) o;
-
-            return suit == that.suit && value == that.value;
-
-        }
-
-        @Override
-        public int hashCode() {
-            int result = suit.hashCode();
-            result = 31 * result + value.hashCode();
-            return result;
-        }
+        // No need for equals and hashcode as we construct only one instance of Card (and block the constructor).
 
         @Override
         public String toString() {
@@ -56,48 +49,58 @@ public class GameDemo {
         }
     }
 
+    /**
+     * All the cards as a convenient list.
+     */
     public static final List<FrenchCard> allCards =
-            stream(Suit.values()).flatMap(suit -> stream(Value.values()).map(value -> new FrenchCard(suit, value)))
+            stream(FrenchCard.Suit.values()).flatMap(suit -> stream(FrenchCard.Value.values()).map(value -> new FrenchCard(suit, value)))
                     .collect(Collectors.toList());
 
+    /**
+     * A dealer strategy implementation that always deals the card on the top of the deck.
+     *
+     * @param <Card> The type of card in the deck
+     */
     static class TopDealer<Card> implements Dealer<Card> {
         @Override
-        public RemoveResult<Card, Card> deal(final Deck<Card> deck) {
+        public Card deal(final Deck<Card> deck) {
             return deck.removeLast();
         }
     }
 
-
+    /**
+     * A shuffler strategy that shuffles the deck so that any card is equally likely to end up at a given place.
+     *
+     * @param <Card> The type of card in the deck
+     */
     static class DeepShuffler<Card> implements Shuffler<Card> {
         @Override
-        public Deck<Card> shuffle(final Deck<Card> deck) {
-            final ArrayList<Card> nextCards = new ArrayList<>();
-            Deck<Card> nextDeck = deck;
-            while (nextDeck.isNotEmpty()) {
-                final RemoveResult<Card, Card> removeResult = nextDeck.removeNth(random(nextDeck.size()));
-                nextCards.add(removeResult.getCard().get()); // OK by construction
-                nextDeck = removeResult.getDeck();
+        public void shuffle(final Deck<Card> deck) {
+            for (int i = 0; i < deck.size() - 1; ++i) {
+                deck.swap(i, random(i, deck.size()));
             }
-            return new IndexedDeck<>(nextCards);
+
         }
 
-        private int random(int limit) {
-            return (int) (Math.random() * limit);
+        private int random(final int lower, final int limit) {
+            return (int) (lower + Math.random() * (limit - lower));
         }
     }
 
-
-    static <Card> RemoveResult<List<Card>, Card> dealN(Dealer<Card> dealer, Deck<Card> deck, int numCards) {
+    /**
+     * A helper function that deals numDeals times and collects the result in a list.
+     */
+    static <Card> List<Card> dealN(Dealer<Card> dealer, Deck<Card> deck, int numDeals) {
         final List<Card> nextCards = new ArrayList<>();
-        Deck<Card> sourceDeck = deck;
-        while (sourceDeck.isNotEmpty() && nextCards.size() < numCards) {
-            final RemoveResult<Card, Card> deal = dealer.deal(sourceDeck);
-            nextCards.add(deal.getCard().get()); // OK by construction
-            sourceDeck = deal.getDeck();
+        for (int i = 0; i < numDeals; ++i) {
+            nextCards.add(dealer.deal(deck));
         }
-        return new RemoveResult<>(Optional.of(nextCards), sourceDeck);
+        return nextCards;
     }
 
+    /**
+     * An implementation of dealing in Wiezen.
+     */
     static class Wiezen implements CompleteDealGame<FrenchCard> {
         private final Dealer<FrenchCard> dealer = new TopDealer<>();
         private final Shuffler<FrenchCard> shuffler;
@@ -113,83 +116,71 @@ public class GameDemo {
             for (int hand = 0; hand < 4; ++hand) {
                 hands.add(new ArrayList<>());
             }
-            Deck<FrenchCard> sourceDeck = shuffler.shuffle(deck);
+            shuffler.shuffle(deck);
             for (final int numCards : numCardsPerRound) {
-                for (int hand = 0; hand < 4; ++hand) {
-                    final RemoveResult<List<FrenchCard>, FrenchCard> result = dealN(dealer, sourceDeck, numCards);
-                    sourceDeck = result.getDeck();
-                    hands.get(hand).addAll(result.getCard().get()); // OK by construction
+                for (int handNum = 0; handNum < 4; ++handNum) {
+                    List<FrenchCard> hand = dealN(dealer, deck, numCards);
+                    hands.get(handNum).addAll(hand);
                 }
             }
             return hands;
         }
     }
 
+    /**
+     * A demonstration of how one class can implement multiple strategy interfaces to do devious things. In this case
+     * the deck is thoroughly shuffled and cards are picked at random, but yet in some way, the ace of harts is always
+     * within the first four cards dealt (with an equal likelihood for all 4 first deals).
+     */
     static class Trickster implements Dealer<FrenchCard>, Shuffler<FrenchCard> {
-
         private final FrenchCard specialCard = allCards.get(0); // the easiest was to pick a card
         private final int limit = 4;
-        private int deals = 0;
+        private int numDeals = 0;
         private int specialPosition = 0;
         private boolean specialWasDealt = false;
-        private boolean specialWasShuffeld = false;
 
         @Override
-        public RemoveResult<FrenchCard, FrenchCard> deal(final Deck<FrenchCard> deck) {
-            final int removePosition;
-            deals += 1;
+        public FrenchCard deal(final Deck<FrenchCard> deck) {
+            final int dealPosition;
+            numDeals += 1;
             // give it an (almost) equal chance that the special card is dealt in every turn until the limit
-            if (!specialWasDealt && Math.random() < 1. * deals / limit) {
-                removePosition = specialPosition;
+            if (!specialWasDealt && Math.random() < 1. * numDeals / limit) {
+                dealPosition = specialPosition;
                 specialWasDealt = true;
             } else {
-                removePosition = (int) (Math.random() * deck.size());
-                if (removePosition < specialPosition) {
+                dealPosition = (int) (Math.random() * deck.size());
+                if (dealPosition < specialPosition) {
                     specialPosition -= 1;
-                } else if (removePosition == specialPosition) {
+                } else if (dealPosition == specialPosition) {
                     specialWasDealt = true;
                 }
             }
-            if (deals == 52) {
-                init();
-            }
-            return deck.removeNth(removePosition);
-        }
-
-        private void init() {
-            deals = 0;
-            specialPosition = 0;
-            specialWasDealt = false;
-            specialWasShuffeld = false;
+            return deck.removeNth(dealPosition);
         }
 
         @Override
-        public Deck<FrenchCard> shuffle(final Deck<FrenchCard> deck) {
-            final ArrayList<FrenchCard> nextCards = new ArrayList<>();
-            Deck<FrenchCard> nextDeck = deck;
-            while (nextDeck.isNotEmpty()) {
-                final RemoveResult<FrenchCard, FrenchCard> removeResult = nextDeck.removeNth(random(nextDeck.size()));
-                final FrenchCard card = removeResult.getCard().get();// OK by construction
-
-                // Has to happen eventually unless the special card was not in the deck to begin with: the trickster tricked!
-                if (card == specialCard) { // equivalence is OK because there is only one instance to begin with
-                    specialWasShuffeld = true;
-                } else {
-                    if (!specialWasShuffeld) {
-                        specialPosition += 1;
-                    }
+        public void shuffle(final Deck<FrenchCard> deck) {
+            // Set up thr trickery
+            numDeals = 0;
+            specialWasDealt = false;
+            // There is a 1 in (52*52) chance that the last card is the special one and that it remains there.
+            specialPosition = 51;
+            for (int i = 0; i < deck.size() - 1; ++i) {
+                deck.swap(i, random(i, deck.size()));
+                if (deck.peek(i) == specialCard) {
+                    specialPosition = i;
                 }
-                nextCards.add(card);
-                nextDeck = removeResult.getDeck();
             }
-            return new IndexedDeck<>(nextCards);
         }
 
-        private int random(int limit) {
-            return (int) (Math.random() * limit);
+        private int random(final int lower, final int limit) {
+            return (int) (lower + Math.random() * (limit - lower));
         }
     }
 
+    /**
+     * A simple game that simply deals all cards in one hands. One would expect the result to be random...
+     */
     static class PickGame implements CompleteDealGame<FrenchCard> {
         final Dealer<FrenchCard> dealer;
         final Shuffler<FrenchCard> shuffler;
@@ -201,16 +192,20 @@ public class GameDemo {
 
         @Override
         public List<List<FrenchCard>> dealAll(final Deck<FrenchCard> deck) {
+            shuffler.shuffle(deck);
             final ArrayList<List<FrenchCard>> hands = new ArrayList<>();
-            final RemoveResult<List<FrenchCard>, FrenchCard> result = dealN(dealer, shuffler.shuffle(deck), allCards.size());
-            hands.add(result.getCard().get());
+            hands.add(dealN(dealer, deck, allCards.size()));
             return hands;
         }
     }
 
-    public static <Card> void showHands(List<List<Card>> hands) {
-        for (final List<Card> hand : hands) {
-            for (final Card card : hand) {
+    /**
+     * Helper to show the hands in a CompleteDealGame. (Guava would have been helpful).
+     */
+    private static void showHands(final CompleteDealGame<FrenchCard> game) {
+        final List<List<FrenchCard>> hands = game.dealAll(new IndexedDeck<>(allCards));
+        for (final List<FrenchCard> hand : hands) {
+            for (final FrenchCard card : hand) {
                 System.out.print(card.toString() + " ");
             }
             System.out.println();
@@ -221,24 +216,22 @@ public class GameDemo {
     public static void main(String[] args) {
         final Shuffler<FrenchCard> deepShuffler = new DeepShuffler<>();
         final CompleteDealGame<FrenchCard> wiezen = new Wiezen(deepShuffler);
-        final IndexedDeck<FrenchCard> initialDeck = new IndexedDeck<>(allCards);
 
-        final CompleteDealGame<FrenchCard> bonafide = new PickGame(new TopDealer<>(), deepShuffler);
+        final CompleteDealGame<FrenchCard> bonaFide = new PickGame(new TopDealer<>(), deepShuffler);
         final Trickster trickster = new Trickster();
         final CompleteDealGame<FrenchCard> tricky = new PickGame(trickster, trickster);
 
-
-        System.out.println("wiezen");
+        System.out.println("====== wiezen ======");
         for (int i = 0; i < 3; ++i) {
-            showHands(wiezen.dealAll(initialDeck));
+            showHands(wiezen);
         }
-        System.out.println("bonafide");
+        System.out.println("====== bona fide ======");
         for (int i = 0; i < 3; ++i) {
-            showHands(bonafide.dealAll(initialDeck));
+            showHands(bonaFide);
         }
-        System.out.println("tricky");
-        for (int i = 0; i < 3; ++i) {
-            showHands(tricky.dealAll(initialDeck));
+        System.out.println("====== tricky ======");
+        for (int i = 0; i < 5; ++i) {
+            showHands(tricky);
         }
     }
 }
